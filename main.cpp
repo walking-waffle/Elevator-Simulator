@@ -9,9 +9,10 @@
 static const int TOTAL_FLOORS = 10;
 static const int MOVE_DELAY_MS = 1000;
 
+// Render both elevators on a console-based building view.
 void render_elevator(Elevator &e1, Elevator &e2)
 {
-    // Clear Screen +
+    // Clear Screen (ANSI escape sequence)
     std::cout << "\033[2J\033[H";
 
     std::cout << "  +------------+------------+\n";
@@ -42,6 +43,7 @@ void render_elevator(Elevator &e1, Elevator &e2)
     std::cout << "----------------------------------\n";
 } // render_elevator
 
+// Simulate elevator movement to target floor and update display.
 void animate_move(Elevator &elevator, Elevator &e1, Elevator &e2, int target)
 {
     if (elevator.current_floor == target)
@@ -63,6 +65,8 @@ void animate_move(Elevator &elevator, Elevator &e1, Elevator &e2, int target)
     elevator.status = "";
 } // animate_move
 
+// input within [lo, hi], enters 0 → program exits
+// If input is non-numeric, input buffer is cleared
 int read_int(const std::string &prompt, int lo, int hi)
 {
     int val;
@@ -84,7 +88,7 @@ int read_int(const std::string &prompt, int lo, int hi)
         } // if
         else
         {
-            // clear illegal input
+            // clear invalid input
             std::cin.clear();
             std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
         } // else
@@ -103,20 +107,20 @@ int main()
 
     while (true)
     {
-        int from_floor = read_int("Enter your current floor (1-10)", 1, TOTAL_FLOORS);
+        int from = read_int("Enter your current floor (1-10)", 1, TOTAL_FLOORS);
 
-        // choose the nearest elevator
-        int dist1 = std::abs(elevator1.current_floor - from_floor);
-        int dist2 = std::abs(elevator2.current_floor - from_floor);
+        // selects nearest elevator
+        int dist1 = std::abs(elevator1.current_floor - from);
+        int dist2 = std::abs(elevator2.current_floor - from);
         Elevator &selected = (dist1 <= dist2) ? elevator1 : elevator2;
         std::cout << selected.name << " is coming.\n";
 
-        animate_move(selected, elevator1, elevator2, from_floor);
+        animate_move(selected, elevator1, elevator2, from);
 
-        int dest_floor = read_int("Enter destination floor  (1-10)", 1, TOTAL_FLOORS);
+        int dest = read_int("Enter destination floor  (1-10)", 1, TOTAL_FLOORS);
 
-        animate_move(selected, elevator1, elevator2, dest_floor);
-        selected.move(selected.current_floor, dest_floor);
+        animate_move(selected, elevator1, elevator2, dest);
+        selected.move(selected.current_floor, dest);
         std::cout << "** Arrived at floor " << selected.current_floor << ". **\n";
     } // while
 
