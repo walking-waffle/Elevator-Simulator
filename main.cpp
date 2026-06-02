@@ -1,195 +1,142 @@
 #include <iostream>
-#include <string>
-#include <chrono>
 #include <thread>
-#include <sstream>
-#include <cstdlib>
+#include <chrono>
+#include <string>
+#include <limits>
 
-const int MIN_FLOOR = 1;
-const int MAX_FLOOR = 10;
-const int MOVE_DELAY_MS = 1000;
-
-void clear_screen()
-{
-#ifdef _WIN32
-    std::system("cls");
-#else
-    std::system("clear");
-#endif
-} // clear_screen
-
-class ElevatorSystem;
-class Elevator;
-void draw_shafts(const Elevator &e1, const Elevator &e2);
+static const int TOTAL_FLOORS = 10;
+static const int MOVE_DELAY_MS = 1000;
 
 class Elevator
 {
 public:
     int current_floor;
-    int target_floor;
     std::string name;
-    ElevatorSystem *system;
+    std::string status;
 
-    Elevator(std::string n, int floor, ElevatorSystem *sys)
-    {
-        name = n;
-        current_floor = floor;
-        target_floor = 0;
-        system = sys;
-    } // construct
+    Elevator(const std::string &n, int start_floor = 1)
+        : current_floor(start_floor), name(n), status("") {}
 
     void display_floor() const
     {
-        std::cout << "[" << name << "] Current floor: " << current_floor << "\n";
-    } // display_floor
+        std::cout << "[" << name << "] Current floor: " << current_floor;
+        if (!status.empty())
+            std::cout << " [" << status << "]";
+        std::cout << "\n";
+    }
 
-    void move(int current, int floor);
+    void move(int current, int floor)
+    {
+        current_floor = current;
+        if (current == floor)
+            return;
+        int direction = (floor > current) ? 1 : -1;
+        while (current_floor != floor)
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(MOVE_DELAY_MS));
+            current_floor += direction;
+            display_floor();
+        }
+    }
 };
 
-std::string cell(const Elevator &e, int f)
+void render_building(const Elevator &e1, const Elevator &e2)
 {
-    bool is_cur = (f == e.current_floor);
-    bool is_tgt = (e.target_floor != 0 && f == e.target_floor);
-    std::ostringstream ss;
-    ss << "  " << (f < 10 ? " " : "") << f;
-    if (is_cur && is_tgt)
-        ss << "  [=]*  ";
-    else if (is_cur)
-        ss << "  [=]   ";
-    else if (is_tgt)
-        ss << "   *    ";
-    else
-        ss << "        ";
-    return ss.str();
-} // cell
+    std::cout << "\033[2J\033[H";
 
-void draw_shafts(const Elevator &e1, const Elevator &e2)
-{
-    std::cout << "\n";
     std::cout << "  +------------+------------+\n";
     std::cout << "  | Elevator 1 | Elevator 2 |\n";
     std::cout << "  +------------+------------+\n";
 
-    for (int f = MAX_FLOOR; f >= MIN_FLOOR; --f)
-        std::cout << "  |" << cell(e1, f) << "|" << cell(e2, f) << "|\n";
+    for (int f = TOTAL_FLOORS; f >= 1; --f)
+    {
+        std::string slot1 = "        ";
+        std::string slot2 = "        ";
+
+        if (e1.current_floor == f)
+            slot1 = "  [=]   ";
+        if (e2.current_floor == f)
+            slot2 = "  [=]   ";
+
+        std::string fnum = std::to_string(f);
+        if (f < 10)
+            fnum = " " + fnum;
+
+        std::cout << "  |  " << fnum << slot1 << "|  " << fnum << slot2 << "|\n";
+    }
 
     std::cout << "  +------------+------------+\n";
-} // draw_shafts
-
-int get_int(const std::string &prompt, bool allow_zero = false)
-{
-    int val;
-
-    while (true)
-    {
-        std::cout << prompt;
-        std::string line;
-        std::getline(std::cin, line);
-        std::istringstream iss(line);
-        if (!(iss >> val))
-        {
-            std::cout << "Please enter a valid number.\n";
-            continue;
-        }
-        if (allow_zero && val == 0)
-            return 0;
-        if (val >= MIN_FLOOR && val <= MAX_FLOOR)
-            return val;
-        std::cout << "Please enter a number between "
-                  << MIN_FLOOR << " and "
-                  << MAX_FLOOR << ".\n";
-    } // while
+    std::cout << "----------------------------------\n";
+    e1.display_floor();
+    e2.display_floor();
+    std::cout << "----------------------------------\n";
 }
 
-class ElevatorSystem
+void animate_move(Elevator &elevator, Elevator &e1, Elevator &e2, int target)
 {
-    Elevator elevator1;
-    Elevator elevator2;
-
-public:
-    ElevatorSystem()
-        : elevator1("Elevator1", 1, this), elevator2("Elevator2", 1, this) {}
-
-    void draw() const
+    if (elevator.current_floor == target)
     {
-        clear_screen();
-        draw_shafts(elevator1, elevator2);
-    } // draw
-
-    void dispatch(int from)
-    {
-        int dist1 = std::abs(elevator1.current_floor - from);
-        int dist2 = std::abs(elevator2.current_floor - from);
-        Elevator &elev = (dist2 < dist1) ? elevator2 : elevator1;
-
-        std::this_thread::sleep_for(std::chrono::milliseconds(800));
-        elev.move(elev.current_floor, from);
-
-        int to = get_int("  Destination floor (1-10): ");
-        std::cout << "\n";
-
-        elev.move(from, to);
-    } // dispatch
-
-    void run()
-    {
-        while (true)
-        {
-            draw();
-
-            std::cout << "Enter 0 to exit.\n";
-            int from = get_int("Your current floor (0-10): ", true);
-
-            if (from == 0)
-            {
-                std::cout << "\nFinish!\n\n";
-                break;
-            } // if
-
-            dispatch(from);
-        } // while
-    } // run
-};
-
-void Elevator::move(int current, int floor)
-{
-    current_floor = current;
-    target_floor = floor;
-
-    if (current == floor)
-    {
-        target_floor = 0;
-        system->draw();
-        display_floor();
+        render_building(e1, e2);
         return;
-    } // if
+    }
 
-    int direction = (floor > current) ? 1 : -1;
+    int direction = (target > elevator.current_floor) ? 1 : -1;
+    elevator.status = (direction == 1) ? "Going UP" : "Going DOWN";
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(600));
-
-    for (int f = current + direction;; f += direction)
+    while (elevator.current_floor != target)
     {
-        current_floor = f;
-        if (f == floor)
-            target_floor = 0;
-
-        system->draw();
-        display_floor();
-
-        if (f == floor)
-            break;
-
         std::this_thread::sleep_for(std::chrono::milliseconds(MOVE_DELAY_MS));
-    } // for
+        elevator.current_floor += direction;
+        render_building(e1, e2);
+    }
 
-    std::cout << "[" << name << "] Arrived at floor " << floor << "\n\n";
-    std::this_thread::sleep_for(std::chrono::milliseconds(800));
-} // move
+    elevator.status = "";
+}
+
+int read_int(const std::string &prompt, int lo, int hi)
+{
+    int val;
+    while (true)
+    {
+        std::cout << prompt << " (or 0 to exit): ";
+        if (std::cin >> val)
+        {
+            if (val == 0)
+            {
+                std::cout << "\nFinish!\n";
+                std::exit(0);
+            }
+            if (val >= lo && val <= hi)
+                return val;
+        }
+        std::cout << "  Please enter a number between " << lo << " and " << hi << ", or 0 to exit.\n";
+    }
+}
 
 int main()
 {
-    ElevatorSystem system;
-    system.run();
+    Elevator elevator1("Elevator 1", 1);
+    Elevator elevator2("Elevator 2", 1);
+
+    render_building(elevator1, elevator2);
+
+    while (true)
+    {
+        int from_floor = read_int("Enter your current floor (1-10)", 1, TOTAL_FLOORS);
+
+        int dist1 = std::abs(elevator1.current_floor - from_floor);
+        int dist2 = std::abs(elevator2.current_floor - from_floor);
+        Elevator &selected = (dist1 <= dist2) ? elevator1 : elevator2;
+        std::cout << "-> " << selected.name << " is dispatched.\n";
+
+        animate_move(selected, elevator1, elevator2, from_floor);
+
+        int dest_floor = read_int("Enter destination floor  (1-10)", 1, TOTAL_FLOORS);
+
+        animate_move(selected, elevator1, elevator2, dest_floor);
+        selected.move(selected.current_floor, dest_floor);
+        std::cout << "** Arrived at floor " << selected.current_floor << ". Doors open. **\n";
+    }
+
     return 0;
-} // main
+}
