@@ -1,38 +1,17 @@
 CXX = g++
-CXXFLAGS = -std=c++17 -Wall
+CXXFLAGS = -std=c++17
+LDFLAGS = -lws2_32
 
-ifeq ($(OS),Windows_NT)
-    EXE = .exe
-    RM = del /Q
-else
-    EXE =
-    RM = rm -f
-endif
+SERVER = server.exe
+CLIENT = client.exe
 
-# exe
-MAIN_TARGET = main$(EXE)
-TEST_TARGET = test$(EXE)
+all: $(SERVER) $(CLIENT)
 
-# obj
-MAIN_OBJS = main.o elevator.o
-TEST_OBJS = test.o elevator.o
+$(SERVER): server.cpp elevator.cpp elevator.h
+	$(CXX) $(CXXFLAGS) server.cpp elevator.cpp -o $(SERVER) $(LDFLAGS)
 
-all: $(MAIN_TARGET) $(TEST_TARGET)
-
-# main
-$(MAIN_TARGET): $(MAIN_OBJS)
-	$(CXX) $(MAIN_OBJS) -o $(MAIN_TARGET) $(CXXFLAGS)
-
-# test
-$(TEST_TARGET): $(TEST_OBJS)
-	$(CXX) $(TEST_OBJS) -o $(TEST_TARGET) $(CXXFLAGS)
-
-# main.cpp → main.o
-# elevator.cpp → elevator.o
-%.o: %.cpp elevator.h
-	$(CXX) $(CXXFLAGS) -c $< -o $@
+$(CLIENT): client.cpp
+	$(CXX) $(CXXFLAGS) client.cpp -o $(CLIENT) $(LDFLAGS)
 
 clean:
-	$(RM) *.o *.obj
-
-.PHONY: all clean
+	del $(SERVER) $(CLIENT)
